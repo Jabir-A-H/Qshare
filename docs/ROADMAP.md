@@ -48,4 +48,5 @@
 - [x] Configure Windows application manifest (`#![windows_subsystem = "windows"]` to suppress terminal window).
 - [ ] Add defensive path sanitization against directory traversal attacks.
 - [x] Build portable single-file release executable (`cargo build --release`).
+- [x] Configure automated GitHub Actions release workflow with manual Run Workflow trigger (`.github/workflows/release.yml`).
 - [ ] Generate installer bundle via `cargo-wix` / `Inno Setup`.

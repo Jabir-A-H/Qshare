@@ -1,0 +1,100 @@
+name: Build & Release Desktop Binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (leave empty to auto-read from Cargo.toml, e.g. v0.1.0)'
+        required: false
+        default: ''
+      is_prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: true
+      release_title:
+        description: 'Release Title (optional, e.g. Qshare v0.1.0 Alpha Preview)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Release Windows Binary
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Resolve Version & Tag
+        id: meta
+        shell: pwsh
+        run: |
+          # Read version from Cargo.toml
+          $cargoVersion = (Select-String -Path "Cargo.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches.Groups[1].Value
+          
+          # Determine tag
+          if ("${{ github.event.inputs.tag_name }}" -ne "") {
+            $tag = "${{ github.event.inputs.tag_name }}"
+          } elseif ("${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+          } else {
+            $tag = "v$cargoVersion"
+          }
+
+          # Determine title
+          if ("${{ github.event.inputs.release_title }}" -ne "") {
+            $title = "${{ github.event.inputs.release_title }}"
+          } else {
+            $title = "Qshare $tag"
+          }
+
+          # Determine prerelease
+          $isPre = "${{ github.event.inputs.is_prerelease }}"
+          if ($isPre -eq "") {
+            if ($tag -match "alpha|beta|rc") { $isPre = "true" } else { $isPre = "false" }
+          }
+
+          Write-Output "Resolved Tag: $tag"
+          Write-Output "Resolved Title: $title"
+          Write-Output "Is Prerelease: $isPre"
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "title=$title" >> $env:GITHUB_OUTPUT
+          "prerelease=$isPre" >> $env:GITHUB_OUTPUT
+
+      - name: Build Standalone Release Executable
+        run: cargo build --release --locked
+
+      - name: Package Windows ZIP Archive
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $zipName = "qshare-$tag-windows-x64.zip"
+          Compress-Archive -Path "target\release\qshare.exe" -DestinationPath "target\release\$zipName" -Force
+          Write-Output "Created target\release\$zipName"
+
+      - name: Publish GitHub Release & Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
+          draft: false
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            target/release/qshare.exe
+            target/release/qshare-*.zip

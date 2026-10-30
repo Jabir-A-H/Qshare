@@ -4,8 +4,8 @@
 - [x] Create public GitHub repository `Jabir-A-H/Qshare`.
 - [x] Initialize Git configuration and `.gitignore`.
 - [x] Establish master documentation suite (`AGENTS.md`, `README.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `KNOWN_ISSUES.md`, `ADR/`).
-- [ ] Install Rust toolchain (`rustup`, `cargo`, `rustc` MSVC) on the host system.
-- [ ] Initialize `Cargo.toml` workspace with foundational dependencies (`iced`, `iroh`, `tokio`, `blake3`, `serde`).
+- [x] Install Rust toolchain (`rustup`, `cargo`, `rustc` MSVC) on the host system.
+- [x] Initialize `Cargo.toml` workspace with foundational dependencies (`iced`, `iroh`, `tokio`, `blake3`, `serde`).
 
 ---
 

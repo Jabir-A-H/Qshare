@@ -3,10 +3,10 @@
 > **Zero-Cloud Hybrid P2P Dropzone for Desktop**  
 > *100% Pure Rust · GPU-Accelerated UI via Iced · QUIC Hole-Punching via Iroh · Zero Cloud Storage*
 
-[![Rust](https://img.shields.io/badge/Language-Rust_2021-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Language-Rust_2024-orange.svg)](https://www.rust-lang.org/)
 [![UI](https://img.shields.io/badge/GUI-Iced_(wgpu)-blue.svg)](https://iced.rs/)
 [![P2P Engine](https://img.shields.io/badge/P2P-Iroh_(QUIC)-purple.svg)](https://iroh.computer/)
-[![License](https://img.shields.io/badge/License-MIT_OR_Apache--2.0-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Unlicensed-lightgrey.svg)](#-license)
 
 ---
 
@@ -115,4 +115,4 @@ cargo build --release
 
 ## 📄 License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at your option.
+Proprietary / Unlicensed for now. All rights reserved. Not open source.

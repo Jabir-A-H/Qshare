@@ -93,9 +93,9 @@ jobs:
           $zipName = "qshare-$tag-windows-x64.zip"
           $checksumFile = "target\release\checksums-$tag.txt"
 
-          # Create matching named .exe
-          Copy-Item -Path "target\release\qshare.exe" -Destination $exeTarget -Force
-          Write-Output "Created $exeTarget"
+          # Enforce strictly version-numbered executable invariant
+          Move-Item -Path "target\release\qshare.exe" -Destination $exeTarget -Force
+          Write-Output "Created version-numbered binary $exeTarget"
 
           # Create matching compressed .zip archive
           Compress-Archive -Path $exeTarget -DestinationPath "target\release\$zipName" -Force

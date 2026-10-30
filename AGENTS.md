@@ -83,3 +83,10 @@ A change is incomplete until verified. Always run the project's quality pipeline
 - **No Destructive Git Operations:** Never execute destructive git operations (`git checkout <file>`, `git restore`, `git stash`, `git reset --hard`) without explicit user permission.
 - **Safe Quarantine Protocol (`_discarded/`):** When refactoring, replacing, or deprecating files, components, or scripts, **never delete them unilaterally**. Move them into `_discarded/` and await user review.
 - **Clickable Links:** Always link modified files and code symbols using `file:///` URLs for seamless IDE navigation.
+
+---
+
+### 🏷️ Principle 8: Strictly Version-Numbered Executable Invariant
+- **No Non-Numbered Binaries:** Never make, retain, distribute, or present unversioned executable files (e.g. bare `qshare.exe`).
+- **Explicit Version Embedding:** Every built release executable and distribution package must have its semantic version explicitly embedded in the filename (e.g. `qshare-v0.2.0-windows-x64.exe` and `qshare-v0.2.0-windows-x64.zip`).
+- **Post-Build Rename & Sanitization:** Whenever `cargo build --release` produces a default unversioned binary (`target/release/qshare.exe`), it must immediately be renamed or packaged with its semantic version tag (`qshare-v<version>-windows-x64.exe`), and any unversioned binary must be removed from release directories so that only version-numbered release artifacts exist.

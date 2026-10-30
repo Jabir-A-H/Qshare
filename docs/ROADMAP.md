@@ -45,7 +45,7 @@
 
 ## Phase 5: Verification, Packaging & Windows Release
 - [ ] Pass strict quality gates (`cargo check`, `cargo clippy -- -D warnings`, `cargo test`).
-- [ ] Configure Windows application manifest (embed `.ico` icon and `#![windows_subsystem = "windows"]` to suppress terminal window).
+- [x] Configure Windows application manifest (`#![windows_subsystem = "windows"]` to suppress terminal window).
 - [ ] Add defensive path sanitization against directory traversal attacks.
-- [ ] Build portable single-file release executable (`cargo build --release`).
+- [x] Build portable single-file release executable (`cargo build --release`).
 - [ ] Generate installer bundle via `cargo-wix` / `Inno Setup`.

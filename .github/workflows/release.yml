@@ -58,11 +58,29 @@ jobs:
             $title = "Qshare $tag"
           }
 
+          # Determine pre-production status (prerelease vs latest)
+          if ($tag -match "-(alpha|beta|rc)" -or $tag -match "^v0\.") {
+            $isPrerelease = "true"
+            $makeLatest = "false"
+          } else {
+            $isPrerelease = "false"
+            $makeLatest = "true"
+          }
+
           Write-Output "Resolved Tag: $tag"
           Write-Output "Resolved Title: $title"
+          Write-Output "Is Prerelease: $isPrerelease"
+          Write-Output "Make Latest: $makeLatest"
 
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "title=$title" >> $env:GITHUB_OUTPUT
+          "prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+          "make_latest=$makeLatest" >> $env:GITHUB_OUTPUT
+
+      - name: Run Quality Verification Gates
+        run: |
+          cargo test --all-targets
+          cargo clippy --all-targets -- -D warnings
 
       - name: Build Standalone Release Executable
         run: cargo build --release --locked
@@ -73,6 +91,7 @@ jobs:
           $tag = "${{ steps.meta.outputs.tag }}"
           $exeTarget = "target\release\qshare-$tag-windows-x64.exe"
           $zipName = "qshare-$tag-windows-x64.zip"
+          $checksumFile = "target\release\checksums-$tag.txt"
 
           # Create matching named .exe
           Copy-Item -Path "target\release\qshare.exe" -Destination $exeTarget -Force
@@ -82,21 +101,30 @@ jobs:
           Compress-Archive -Path $exeTarget -DestinationPath "target\release\$zipName" -Force
           Write-Output "Created target\release\$zipName"
 
+          # Generate cryptographic SHA-256 checksums
+          $exeHash = (Get-FileHash -Path $exeTarget -Algorithm SHA256).Hash.ToLower()
+          $zipHash = (Get-FileHash -Path "target\release\$zipName" -Algorithm SHA256).Hash.ToLower()
+          "$exeHash  $(Split-Path $exeTarget -Leaf)" | Out-File -FilePath $checksumFile -Encoding utf8
+          "$zipHash  $zipName" | Out-File -FilePath $checksumFile -Append -Encoding utf8
+          Write-Output "Generated SHA-256 Checksums in $checksumFile"
+
       - name: Publish GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.title }}
           draft: false
-          prerelease: false
-          make_latest: true
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          make_latest: ${{ steps.meta.outputs.make_latest }}
           generate_release_notes: true
           body: |
-            ### 📦 Available Downloads (Same Application, Different Packaging):
+            ### 📦 Available Downloads (Pre-Production Build)
             > **Note:** Both download options below contain the exact same application. Choose whichever packaging fits your preference:
 
             1. **`qshare-${{ steps.meta.outputs.tag }}-windows-x64.exe`**: Direct standalone executable. Ready to run immediately with zero unzipping required.
             2. **`qshare-${{ steps.meta.outputs.tag }}-windows-x64.zip`**: Compressed archive (~57% smaller download) containing the exact same `.exe` binary. Ideal if your browser or network restricts `.exe` downloads.
+            3. **`checksums-${{ steps.meta.outputs.tag }}.txt`**: SHA-256 cryptographic verification hashes.
           files: |
             target/release/qshare-${{ steps.meta.outputs.tag }}-windows-x64.exe
             target/release/qshare-${{ steps.meta.outputs.tag }}-windows-x64.zip
+            target/release/checksums-${{ steps.meta.outputs.tag }}.txt

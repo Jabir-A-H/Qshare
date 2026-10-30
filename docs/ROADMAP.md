@@ -9,44 +9,59 @@
 
 ---
 
-## Phase 2: Core Headless P2P Engine & Loopback Tests
-- [ ] Scaffold `src/core/` module structure (`p2p.rs`, `lan.rs`, `transfer.rs`).
-- [ ] Implement `Iroh` endpoint lifecycle:
-  - [ ] Ephemeral keypair generation (`NodeId`).
-  - [ ] Ticket encoding and decoding (`BlobTicket`).
-  - [ ] STUN address discovery and hole punching.
-- [ ] Implement BLAKE3 chunked file reader & writer (`.part` temporary file handling).
-- [ ] Write automated integration test: loopback sender-receiver file transfer without UI.
+## Phase 2: Core Headless P2P Engine & Loopback Tests (Completed)
+- [x] Scaffold `src/core/` module structure (`p2p.rs`, `ticket.rs`, `storage.rs`, `transfer.rs`, `security.rs`, `discovery.rs`, `lan.rs`).
+- [x] Implement `Iroh 1.4.1` endpoint lifecycle:
+  - [x] Ephemeral keypair generation (`EndpointId`).
+  - [x] Canonical Base32 ticket encoding/decoding (`QshareTicket`) with strict SSRF defense.
+  - [x] STUN address discovery, hole punching, and stateless blind relay fallback.
+  - [x] Dynamic path migration telemetry qualification (`LocalLan`, `DirectP2P`, `BlindRelay`).
+- [x] Implement BLAKE3 chunked file reader & writer (`.part` temporary file handling):
+  - [x] Bounded chunk buffers (128 KB).
+  - [x] Non-destructive partial file quarantine on premature stream termination (`SEC4-CRIT-01`).
+  - [x] Physical disk barrier (`sync_all()`) and Windows antivirus file lock retry loop.
+  - [x] Cross-volume rename copy fallback.
+- [x] Write automated headless integration tests: loopback sender-receiver file transfer without UI (`tests/p2p_test.rs`, `tests/streaming_disk_io_test.rs`).
 
 ---
 
-## Phase 3: Local Network Discovery Engine (LAN)
-- [ ] Implement mDNS advertiser and listener (`mdns-sd` or `iroh-net` discovery).
-- [ ] Broadcast local device hostname, OS avatar identifier, and active service port.
-- [ ] Implement peer table state with heartbeat timeout eviction.
-- [ ] Integrate local direct socket streaming fallback when on identical subnet.
+## Phase 3: Local Network Discovery Engine (LAN) (Completed)
+- [x] Implement mDNS advertiser and listener (`simple-dns` on UDP `0.0.0.0:5353` with `SO_REUSEADDR` & ephemeral port fallback).
+- [x] Broadcast local device hostname, OS avatar identifier (`OsType`), and active service port.
+- [x] Implement bounded peer table state (`MAX_LAN_PEERS = 256`) with 3-tier TTL lifecycle (Active <8s, Stale 8-15s, Evicted >15s) and sender rate-limiting.
+- [x] Implement RFC 6762 Goodbye packet ($\text{TTL} = 0$) detection for instant peer removal and automated broadcast on shutdown.
+- [x] Write automated headless integration tests (`tests/lan_test.rs`).
 
 ---
 
-## Phase 4: Iced Desktop GUI & Elm State Machine
-- [x] Configure `Iced` application shell with modern dark theme and explicit centered window geometry.
-- [ ] Build **Tab 1: LAN Radar View**:
-  - [ ] Interactive peer cards with device avatars and connection latency.
-  - [ ] Drag-and-drop file target over peer avatars.
-- [ ] Build **Tab 2: Send Anywhere (Internet P2P) View**:
-  - [ ] Ticket generator with one-click copy button.
-  - [ ] Ticket input field for receiver with instant peer resolution.
-  - [ ] Dynamic connection badge (**Local LAN** / **Direct P2P** / **Encrypted Relay**).
-- [ ] Build **Transfer Drawer / Progress Modal**:
-  - [ ] Real-time progress bar, transfer throughput gauge (MB/s), and ETA calculation.
-  - [ ] Cancel / abort transfer action.
+## Phase 4: Iced Desktop GUI & Elm State Machine (Completed)
+- [x] Configure `Iced 0.13` application shell with modern dark theme and explicit centered window geometry (`850 × 650`).
+- [x] Build **Tab 1: LAN Radar View**:
+  - [x] Interactive peer cards with device avatars, socket addresses, and stale status.
+  - [x] Polar radar canvas program rendering peers at deterministic coordinates.
+  - [x] Empty state radar pulse and Wi-Fi Client Isolation fallback prompt (`KI-002`).
+  - [x] Scrollable container for high-density peer lists.
+- [x] Build **Tab 2: Send Anywhere (Internet P2P) View**:
+  - [x] Dropzone with cached non-blocking metadata inspection.
+  - [x] One-time encrypted Share Ticket box with one-click copy and "Copied! ✓" visual toast.
+  - [x] Ticket input field for receiver with focused border states and Base32 pre-validation.
+- [x] Build **Transfer Drawer / Progress Modal**:
+  - [x] Real-time progress bar, transferred byte gauge, and EMA-smoothed throughput gauge (MB/s).
+  - [x] Countdown ETA calculation and connection route badge (`Local LAN` / `Direct P2P` / `Blind Relay`).
+  - [x] Cancel transfer and separate modal dismiss actions.
+  - [x] Bidirectional Unicode (BiDi) and path traversal sanitization on remote filenames.
+- [x] Wire non-blocking asynchronous file dialogs via `rfd::AsyncFileDialog` in `iced::Task::perform`.
+- [x] Intercept window close events (`exit_on_close_request: false`) during active transfers with confirmation modal.
+- [x] Write headless UI state transition tests (`tests/ui_state_test.rs`).
 
 ---
 
-## Phase 5: Verification, Packaging & Windows Release
-- [ ] Pass strict quality gates (`cargo check`, `cargo clippy -- -D warnings`, `cargo test`).
+## Phase 5: Verification, Packaging & Windows Release (Active)
+- [x] Pass strict quality gates (`cargo check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` - 49/49 passed, `cargo fmt -- --check`).
 - [x] Configure Windows application manifest (`#![windows_subsystem = "windows"]` to suppress terminal window).
-- [ ] Add defensive path sanitization against directory traversal attacks.
+- [x] Implement `PathSanitizer` defending against directory traversal, Win32 illegal characters, trailing dots/spaces, and all 25 DOS device names (`CON`, `PRN`, `AUX`, `NUL`, `CONIN$`, `CONOUT$`, `CLOCK$`, `COM1-9`, `LPT1-9`).
+- [x] Implement collision-safe destination jailing against existing files and active `.part` streams.
+- [x] Implement `CrashReporter` in `%LOCALAPPDATA%\Qshare\logs\crash.log` with backtraces and headless CI dialog suppression.
 - [x] Build portable single-file release executable (`cargo build --release`).
 - [x] Configure automated GitHub Actions release workflow with manual Run Workflow trigger (`.github/workflows/release.yml`).
 - [ ] Generate installer bundle via `cargo-wix` / `Inno Setup`.

@@ -54,18 +54,21 @@ Under NO circumstances should any user file content or file metadata be stored o
 - **Data Flow:** Peers on the same subnet bypass all internet routing, exchanging data over direct local TCP/QUIC streams at local switch or Wi-Fi speeds.
 
 ### 2. Wide Area Network (Internet Direct P2P via Hole Punching)
-- **Transport:** QUIC over UDP (leveraging TLS 1.3 encryption natively).
+- **Transport:** QUIC over UDP (leveraging TLS 1.3 encryption natively via Iroh 1.4.1).
 - **Rendezvous Coordination:**
-  1. Sender generates an ephemeral cryptographic keypair (Ed25519) and forms an `iroh::Ticket`.
+  1. Sender generates an ephemeral cryptographic keypair (Ed25519) and forms a canonical `QshareTicket`.
   2. The ticket contains:
-     - `NodeId` (Public key of the sender).
-     - Rendezvous relay coordinates.
-     - Content hash of the file payload (BLAKE3).
-  3. The receiver inputs the ticket string into Qshare.
+     - `EndpointId` (Public key of the sender).
+     - Rendezvous relay coordinates (validated against SSRF allowlists).
+     - Content hash of the file payload (BLAKE3 root hash).
+     - Payload total byte size.
+     - Direct socket addresses.
+  3. The receiver inputs the Base32-encoded ticket string into Qshare.
   4. Both peers ping the rendezvous signaling relay via STUN to discover their respective external public socket mappings (`Public IP:Port`).
   5. The relay swaps these external coordinates and exits the data path.
   6. Both peers simultaneously send probe packets to each other's mapped endpoints.
   7. Home and standard NAT firewalls map this incoming packet to the existing outbound state table, opening a direct bi-directional UDP tunnel (**UDP Hole Punch**).
+  8. If direct UDP hole-punching fails (e.g. strict symmetric NAT or silent Windows Defender UDP drop), the connection transparently routes through the blind stateless relay, with dynamic telemetry updating the active route badge.
 
 ### 3. Stateless Blind Relay Fallback
 - **Trigger:** Strict symmetric NAT (common on cellular 4G/5G mobile carriers or enterprise firewalls) where mapped ports randomize per connection.
@@ -136,8 +139,12 @@ The UI listens to background engine events via `Subscription::batch`:
 
 | Threat | Vector | Mitigation in Qshare |
 | :--- | :--- | :--- |
-| **Eavesdropping on Transfer** | Wi-Fi packet sniffing or ISP snooping | All transfers (both LAN and WAN) use end-to-end TLS 1.3 / ChaCha20-Poly1305 encryption. |
+| **Eavesdropping on Transfer** | Wi-Fi packet sniffing or ISP snooping | All transfers (both LAN and WAN) use end-to-end TLS 1.3 / ChaCha20-Poly1305 encryption with Ed25519 node keys. |
 | **Man-in-the-Middle (MitM)** | Rogue signaling or relay node | Peer endpoints authenticate each other using cryptographic Ed25519 node public keys embedded in the Share Ticket. |
-| **Payload Tampering** | Bit flips, MITM injection, or packet corruption | Real-time BLAKE3 cryptographic hash verification. Corrupt chunks are rejected. |
-| **Cloud Data Leakage / Subpoena** | Server seizure or cloud breach | **Zero Cloud Storage**: No user data or metadata is ever saved on servers. |
-| **Disk Overwrite Hijack** | Malicious peer sending `../../Windows/System32/file` | Strict path sanitization: Qshare isolates incoming files to a designated Downloads directory and strips directory traversal paths. |
+| **SSRF Relay Redirection** | Malicious ticket supplying internal IP as relay | Strict SSRF defense in `src/core/ticket.rs` rejecting non-HTTPS, loopback, link-local, RFC 1918 private subnets, and cloud metadata IPs (`169.254.169.254`). |
+| **Payload Tampering** | Bit flips, MITM injection, or packet corruption | Real-time incremental BLAKE3 cryptographic hash verification. Corrupt chunks are isolated and rejected. |
+| **Premature Disconnect Data Loss** | Connection drop at 99% of multi-GB file | Non-destructive quarantine (`SEC4-CRIT-01`): `.part` files are preserved on disk without premature hash-mismatch purging, enabling resumption. |
+| **Cloud Data Leakage / Subpoena** | Server seizure or cloud breach | **Zero Cloud Storage**: No user data or metadata is ever saved on servers. Relays operate statelessly in memory with **0 MB disk persistence**. |
+| **Disk Overwrite & Traversal** | Malicious peer sending `../../Windows/System32/file` | Strict `PathSanitizer` in `src/core/security.rs`: rejects path traversals (`..`, `/`, `\`), strips illegal Win32 characters, and prefixes all 25 DOS reserved device names (`CON`, `PRN`, `AUX`, `NUL`, etc.). |
+| **Collision Overwrite** | Incoming file matching existing filename | Collision-safe auto-incrementing jailing resolving against both finalized files and active `.part` streams (`file (1).ext`). |
+| **Antivirus Lock Stalls** | Windows Defender locking newly written files | Asynchronous retry loop with exponential backoff (`atomic_rename_with_retry`) mitigating transient sharing locks (`ERROR_SHARING_VIOLATION`). |

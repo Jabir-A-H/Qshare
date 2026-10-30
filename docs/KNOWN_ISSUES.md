@@ -36,4 +36,9 @@ This document tracks active bugs, network field edge cases, security considerati
 
 ## Resolved Historical Issues
 
-*No historical issues recorded yet (Project in initial scaffolding phase).*
+### KI-004: Windows Subsystem 0×0 Invisible Window Launch
+- **Category:** GUI / Windows Platform
+- **Status:** `[RESOLVED]` (Resolved on 2026-10-30 in commit `1d6e5a7`)
+- **Impact:** High (Process ran in background but window never appeared on screen)
+- **Description:** Invoking `iced::application().centered().run()` without explicit `window::Settings` caused `winit` on Windows to allocate an uninitialized surface measuring `Width=0, Height=0` with `Visible=False`. Combined with `#![windows_subsystem = "windows"]`, the app appeared completely unresponsive to the user.
+- **Resolution:** Configured explicit `iced::window::Settings` with an initial size of `850 × 650`, `min_size: 600 × 450`, and centered positioning. Attached `std::panic::set_hook` and `rfd::MessageDialog` to ensure any future launch issues or panics display a native Windows error popup and log to `qshare_crash.log`.

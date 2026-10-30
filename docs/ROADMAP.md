@@ -29,7 +29,7 @@
 ---
 
 ## Phase 4: Iced Desktop GUI & Elm State Machine
-- [ ] Configure `Iced` application shell with modern dark/light theme tokens.
+- [x] Configure `Iced` application shell with modern dark theme and explicit centered window geometry.
 - [ ] Build **Tab 1: LAN Radar View**:
   - [ ] Interactive peer cards with device avatars and connection latency.
   - [ ] Drag-and-drop file target over peer avatars.

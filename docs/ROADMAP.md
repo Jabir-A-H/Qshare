@@ -63,5 +63,6 @@
 - [x] Implement collision-safe destination jailing against existing files and active `.part` streams.
 - [x] Implement `CrashReporter` in `%LOCALAPPDATA%\Qshare\logs\crash.log` with backtraces and headless CI dialog suppression.
 - [x] Build portable single-file release executable (`cargo build --release`).
-- [x] Configure automated GitHub Actions release workflow with manual Run Workflow trigger (`.github/workflows/release.yml`).
+- [x] Configure automated GitHub Actions release workflow and enforce Strictly Version-Numbered Executable Invariant (Principle 8).
+- [x] Publish initial pre-production developer preview release (`v0.2.0-alpha`).
 - [ ] Generate installer bundle via `cargo-wix` / `Inno Setup`.

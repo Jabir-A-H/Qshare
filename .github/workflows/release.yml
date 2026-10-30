@@ -79,12 +79,19 @@ jobs:
       - name: Build Standalone Release Executable
         run: cargo build --release --locked
 
-      - name: Package Windows ZIP Archive
+      - name: Package Windows Binary and ZIP Archive
         shell: pwsh
         run: |
           $tag = "${{ steps.meta.outputs.tag }}"
+          $exeTarget = "target\release\qshare-$tag-windows-x64.exe"
           $zipName = "qshare-$tag-windows-x64.zip"
-          Compress-Archive -Path "target\release\qshare.exe" -DestinationPath "target\release\$zipName" -Force
+
+          # Create matching named .exe
+          Copy-Item -Path "target\release\qshare.exe" -Destination $exeTarget -Force
+          Write-Output "Created $exeTarget"
+
+          # Create matching compressed .zip archive
+          Compress-Archive -Path $exeTarget -DestinationPath "target\release\$zipName" -Force
           Write-Output "Created target\release\$zipName"
 
       - name: Publish GitHub Release & Upload Assets
@@ -95,6 +102,12 @@ jobs:
           draft: false
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           generate_release_notes: true
+          body: |
+            ### 📦 Available Downloads (Same Application, Different Packaging):
+            > **Note:** Both download options below contain the exact same application. Choose whichever packaging fits your preference:
+
+            1. **`qshare-${{ steps.meta.outputs.tag }}-windows-x64.exe`**: Direct standalone executable. Ready to run immediately with zero unzipping required.
+            2. **`qshare-${{ steps.meta.outputs.tag }}-windows-x64.zip`**: Compressed archive (~57% smaller download) containing the exact same `.exe` binary. Ideal if your browser or network restricts `.exe` downloads.
           files: |
-            target/release/qshare.exe
-            target/release/qshare-*.zip
+            target/release/qshare-${{ steps.meta.outputs.tag }}-windows-x64.exe
+            target/release/qshare-${{ steps.meta.outputs.tag }}-windows-x64.zip

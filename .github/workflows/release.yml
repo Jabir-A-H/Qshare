@@ -4,15 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (leave empty to auto-read from Cargo.toml, e.g. v0.1.0)'
+        description: 'Release Tag (leave empty to auto-read from Cargo.toml, e.g. v1.0.0)'
         required: false
         default: ''
-      is_prerelease:
-        description: 'Mark as pre-release (unchecked shows in repo sidebar as Latest)'
-        type: boolean
-        default: false
       release_title:
-        description: 'Release Title (optional, e.g. Qshare v0.1.0 Alpha Preview)'
+        description: 'Release Title (optional, e.g. Qshare v1.0.0)'
         required: false
         default: ''
   push:
@@ -62,19 +58,11 @@ jobs:
             $title = "Qshare $tag"
           }
 
-          # Determine prerelease
-          $isPre = "${{ github.event.inputs.is_prerelease }}"
-          if ($isPre -eq "") {
-            $isPre = "false"
-          }
-
           Write-Output "Resolved Tag: $tag"
           Write-Output "Resolved Title: $title"
-          Write-Output "Is Prerelease: $isPre"
 
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "title=$title" >> $env:GITHUB_OUTPUT
-          "prerelease=$isPre" >> $env:GITHUB_OUTPUT
 
       - name: Build Standalone Release Executable
         run: cargo build --release --locked
@@ -100,7 +88,8 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.title }}
           draft: false
-          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           body: |
             ### 📦 Available Downloads (Same Application, Different Packaging):

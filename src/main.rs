@@ -1,18 +1,46 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use iced::widget::{button, column, container, row, text};
-use iced::{Alignment, Element, Length, Theme};
+use iced::{Alignment, Element, Length, Size, Theme, window};
 
-pub fn main() -> iced::Result {
-    // Initialize structured terminal logging
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Catch any panics and show a native Windows dialog instead of dying silently
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!("Qshare encountered an unexpected panic:\n\n{info}");
+        let _ = std::fs::write("qshare_crash.log", &msg);
+        rfd::MessageDialog::new()
+            .set_title("Qshare Error")
+            .set_description(&msg)
+            .set_level(rfd::MessageLevel::Error)
+            .show();
+    }));
+
+    // Initialize structured logging
     tracing_subscriber::fmt::init();
-
     tracing::info!("Launching Qshare desktop application...");
 
-    iced::application("Qshare (⚡)", Qshare::update, Qshare::view)
+    let res = iced::application("Qshare (⚡)", Qshare::update, Qshare::view)
+        .window(window::Settings {
+            size: Size::new(850.0, 650.0),
+            min_size: Some(Size::new(600.0, 450.0)),
+            position: window::Position::Centered,
+            exit_on_close_request: true,
+            ..Default::default()
+        })
         .theme(|_| Theme::Dark)
-        .centered()
-        .run()
+        .run();
+
+    if let Err(e) = res {
+        let msg = format!("Failed to launch Qshare window:\n\n{e}");
+        let _ = std::fs::write("qshare_crash.log", &msg);
+        rfd::MessageDialog::new()
+            .set_title("Qshare Launch Error")
+            .set_description(&msg)
+            .set_level(rfd::MessageLevel::Error)
+            .show();
+    }
+
+    Ok(())
 }
 
 #[derive(Default)]

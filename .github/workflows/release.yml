@@ -8,9 +8,9 @@ on:
         required: false
         default: ''
       is_prerelease:
-        description: 'Mark as pre-release'
+        description: 'Mark as pre-release (unchecked shows in repo sidebar as Latest)'
         type: boolean
-        default: true
+        default: false
       release_title:
         description: 'Release Title (optional, e.g. Qshare v0.1.0 Alpha Preview)'
         required: false
@@ -65,7 +65,7 @@ jobs:
           # Determine prerelease
           $isPre = "${{ github.event.inputs.is_prerelease }}"
           if ($isPre -eq "") {
-            if ($tag -match "alpha|beta|rc") { $isPre = "true" } else { $isPre = "false" }
+            $isPre = "false"
           }
 
           Write-Output "Resolved Tag: $tag"

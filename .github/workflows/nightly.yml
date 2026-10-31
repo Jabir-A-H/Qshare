@@ -1,0 +1,263 @@
+name: Nightly & Push Build Artifacts
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-windows:
+    name: Build Windows Nightly Binary
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Resolve Version & Tag
+        id: meta
+        shell: pwsh
+        run: |
+          $cargoVersion = (Select-String -Path "Cargo.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches.Groups[1].Value
+          $shortSha = (git rev-parse --short HEAD)
+          $tag = "v$cargoVersion-nightly-$shortSha"
+          Write-Output "Resolved Nightly Tag: $tag"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Build Standalone Executable
+        run: cargo build --release --locked
+
+      - name: Package Windows Binary and ZIP Archive
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          $exeTarget = "dist\qshare-$tag-windows-x64.exe"
+          $zipName = "qshare-$tag-windows-x64.zip"
+          $checksumFile = "dist\checksums-$tag-windows.txt"
+
+          Move-Item -Path "target\release\qshare.exe" -Destination $exeTarget -Force
+          Compress-Archive -Path $exeTarget -DestinationPath "dist\$zipName" -Force
+
+          $exeHash = (Get-FileHash -Path $exeTarget -Algorithm SHA256).Hash.ToLower()
+          $zipHash = (Get-FileHash -Path "dist\$zipName" -Algorithm SHA256).Hash.ToLower()
+          "$exeHash  $(Split-Path $exeTarget -Leaf)" | Out-File -FilePath $checksumFile -Encoding utf8
+          "$zipHash  $zipName" | Out-File -FilePath $checksumFile -Append -Encoding utf8
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qshare-${{ steps.meta.outputs.tag }}-windows-x64
+          path: dist/*
+          retention-days: 3
+
+  build-android:
+    name: Build Android Nightly APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+          add-to-path: true
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            crates/qshare-ffi
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Resolve Version & Tag
+        id: meta
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d '"' -f2)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG="v${CARGO_VERSION}-nightly-${SHORT_SHA}"
+          echo "Resolved Nightly Tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Build Native Rust Engine for Android
+        run: |
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 \
+            -o android/app/src/main/jniLibs \
+            build --manifest-path crates/qshare-ffi/Cargo.toml --release
+
+      - name: Generate UniFFI Kotlin Bindings
+        run: |
+          cargo run --manifest-path crates/qshare-ffi/Cargo.toml --bin uniffi-bindgen \
+            generate crates/qshare-ffi/src/lib.rs \
+            --language kotlin \
+            --out-dir android/app/src/main/kotlin/uniffi/
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Android APK with Gradle
+        run: |
+          cd android
+          gradle assembleRelease --no-daemon
+          cd ..
+
+      - name: Package Version-Numbered APK
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p dist
+          APK_SRC=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          APK_DEST="dist/qshare-${TAG}-android.apk"
+          cp "$APK_SRC" "$APK_DEST"
+          cd dist
+          sha256sum "$(basename "$APK_DEST")" > "checksums-${TAG}-android.txt"
+          cd ..
+
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qshare-${{ steps.meta.outputs.tag }}-android-apk
+          path: dist/*
+          retention-days: 3
+
+  build-macos:
+    name: Build macOS & Apple Nightly Artifacts
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            crates/qshare-ffi
+
+      - name: Resolve Version & Tag
+        id: meta
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d '"' -f2)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG="v${CARGO_VERSION}-nightly-${SHORT_SHA}"
+          echo "Resolved Nightly Tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Build Universal macOS Desktop Binary (Apple Silicon + Intel)
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p target/release/macos
+          lipo -create -output target/release/macos/qshare \
+            target/aarch64-apple-darwin/release/qshare \
+            target/x86_64-apple-darwin/release/qshare
+          chmod +x target/release/macos/qshare
+
+      - name: Package macOS Universal Archive
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p dist
+          ZIP_NAME="qshare-${TAG}-macos-universal.zip"
+          cd target/release/macos
+          zip -r "../../../dist/${ZIP_NAME}" qshare
+          cd ../../..
+          cd dist
+          shasum -a 256 "${ZIP_NAME}" > "checksums-${TAG}-macos.txt"
+          cd ..
+
+      - name: Build Native iOS & macOS Engine Library (UniFFI)
+        run: |
+          cargo build --manifest-path crates/qshare-ffi/Cargo.toml --release --target aarch64-apple-ios
+          cargo build --manifest-path crates/qshare-ffi/Cargo.toml --release --target aarch64-apple-darwin
+          mkdir -p apple/generated
+          cargo run --manifest-path crates/qshare-ffi/Cargo.toml --bin uniffi-bindgen \
+            generate crates/qshare-ffi/src/lib.rs \
+            --language swift \
+            --out-dir apple/generated/
+
+      - name: Package iOS & macOS Native Swift Framework Archive
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          FRAMEWORK_ZIP="qshare-${TAG}-apple-frameworks.zip"
+          mkdir -p apple/build/ios apple/build/macos
+          cp crates/qshare-ffi/target/aarch64-apple-ios/release/libqshare_ffi.a apple/build/ios/
+          cp crates/qshare-ffi/target/aarch64-apple-darwin/release/libqshare_ffi.dylib apple/build/macos/
+          cp -r apple/generated apple/build/
+          cd apple/build
+          zip -r "../../dist/${FRAMEWORK_ZIP}" .
+          cd ../..
+          cd dist
+          shasum -a 256 "${FRAMEWORK_ZIP}" > "checksums-${TAG}-apple-frameworks.txt"
+          cd ..
+
+      - name: Upload Apple Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qshare-${{ steps.meta.outputs.tag }}-apple-builds
+          path: dist/*
+          retention-days: 3
+
+  prune-old-artifacts:
+    name: Prune Outdated Run Artifacts
+    needs: [build-windows, build-android, build-macos]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Delete Artifacts From Previous Runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Scanning for outdated artifacts from earlier nightly workflow runs..."
+          PREV_RUNS=$(gh api "repos/${{ github.repository }}/actions/workflows/nightly.yml/runs?per_page=30" \
+            --jq ".workflow_runs[] | select(.id != ${{ github.run_id }}) | .id" 2>/dev/null || true)
+
+          for RUN_ID in $PREV_RUNS; do
+            echo "Checking artifacts in previous run $RUN_ID..."
+            ART_IDS=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts" \
+              --jq ".artifacts[].id" 2>/dev/null || true)
+            for ART_ID in $ART_IDS; do
+              echo "Pruning outdated artifact $ART_ID from run $RUN_ID..."
+              gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/${ART_ID}" || true
+            done
+          done
+          echo "Outdated artifact cleanup complete."

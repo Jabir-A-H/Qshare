@@ -31,6 +31,10 @@ Desktop.ini
 _discarded/
 .discard/
 
+# Distribution & release packages
+dist/
+**/dist/
+
 # Android build artifacts
 .gradle/
 **/android/**/build/

@@ -69,35 +69,36 @@
 
 ---
 
-## Phase 6: Multiplatform Core Decoupling via UniFFI (Planned)
-- [ ] Record formal architecture record ([ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native-ecosystem-cockpit-architecture.md)).
-- [ ] Configure `Cargo.toml` with dual `[lib]` crate types (`rlib` and `cdylib`).
-- [ ] Integrate Mozilla `uniffi-rs` interface definitions in `src/core/`:
-  - [ ] Ephemeral keypair and Base32 ticket operations.
-  - [ ] P2P transfer session lifecycle and chunk streaming states.
-  - [ ] mDNS local network discovery emitter and peer lifecycle.
-- [ ] Set up `cargo-ndk` cross-compilation pipeline for Android ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
-- [ ] Set up Apple target cross-compilation pipeline (`aarch64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`).
-- [ ] Write headless foreign-function interface integration tests.
+## Phase 6: Multiplatform Core Decoupling via UniFFI (Completed)
+- [x] Record formal architecture record ([ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native-ecosystem-cockpit-architecture.md)).
+- [x] Configure headless core decoupling via feature flags (`[features] default = ["desktop"]`) and standalone `crates/qshare-ffi` UniFFI crate.
+- [x] Integrate Mozilla `uniffi-rs` (v0.28) interface definitions in `crates/qshare-ffi/src/lib.rs`:
+  - [x] Ephemeral keypair and Base32 ticket operations.
+  - [x] P2P transfer session lifecycle and chunk streaming states.
+  - [x] mDNS local network discovery emitter and peer lifecycle.
+- [x] Set up `cargo-ndk` cross-compilation pipeline for Android ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) on GitHub Actions.
+- [x] Set up Apple target cross-compilation pipeline (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-apple-ios`) on GitHub Actions.
+- [x] Build automated CI/CD two-tier matrix: nightly artifact builds with auto-prune, and unified multi-platform release publisher.
 
 ---
 
-## Phase 7: Native Android APK Shell (Planned)
-- [ ] Scaffold Android Studio project with Kotlin & Jetpack Compose (`mobile/android/`).
-- [ ] Integrate generated `libqshare_core.so` and UniFFI Kotlin bindings.
+## Phase 7: Native Android APK Shell (Active)
+- [x] Scaffold Android Studio project with Kotlin & Jetpack Compose (`android/`).
+- [x] Integrate generated `libqshare_ffi.so` and UniFFI Kotlin bindings.
+- [x] Implement `WifiManager.MulticastLock` lifecycle management (`MulticastLockManager.kt`) to preserve mDNS packet ingress.
+- [x] Implement Android **Foreground Service** (`TransferService.kt`) with active transfer progress notification bar.
+- [x] Configure automated GitHub Actions APK release packaging (`qshare-v<version>-android.apk`).
 - [ ] Implement `StorageAccessFramework` (SAF) and `DocumentFile` file picker and streaming sink.
-- [ ] Implement `WifiManager.MulticastLock` lifecycle management to preserve mDNS packet ingress.
-- [ ] Implement Android **Foreground Service** with active transfer progress notification bar.
 - [ ] Implement CameraX QR barcode scanner for instant Share Ticket import.
 - [ ] Register Android `ACTION_SEND` and `ACTION_SEND_MULTIPLE` intent filters for OS-wide Share Sheet support.
-- [ ] Configure automated GitHub Actions APK release packaging (`qshare-v<version>-android.apk`).
 
 ---
 
-## Phase 8: Native Apple Ecosystem Shells (Planned)
-- [ ] Scaffold unified Xcode project with Swift & SwiftUI (`apple/`).
-- [ ] Integrate generated UniFFI Swift framework.
-- [ ] Build macOS native Cockpit:
+## Phase 8: Native Apple Ecosystem Shells (Active)
+- [x] Scaffold Apple target pipeline with Swift & UniFFI framework export (`apple/`).
+- [x] Configure automated Universal macOS binary packaging (Apple Silicon + Intel).
+- [ ] Build macOS native Cockpit with Menu Bar dropzone.
+- [ ] Build iOS native Cockpit with AirDrop-like peer discovery.
   - [ ] Persistent Menu Bar icon and drag-and-drop dropzone.
   - [ ] Finder right-click context menu extension ("Share via Qshare").
   - [ ] Native macOS Notification Center integration.

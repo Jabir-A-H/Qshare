@@ -15,10 +15,15 @@ path = "src/lib.rs"
 [[bin]]
 name = "qshare"
 path = "src/main.rs"
+required-features = ["desktop"]
+
+[features]
+default = ["desktop"]
+desktop = ["dep:iced", "dep:rfd"]
 
 [dependencies]
 # GUI Framework (GPU-accelerated via wgpu / DirectX 12)
-iced = { version = "0.13", features = ["tokio", "canvas", "image", "svg"] }
+iced = { version = "0.13", features = ["tokio", "canvas", "image", "svg"], optional = true }
 
 # Multi-threaded Asynchronous Engine
 tokio = { version = "1", features = ["full"] }
@@ -41,12 +46,12 @@ futures = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 
 # Native System & File Dialogs
-rfd = "0.15"
+rfd = { version = "0.15", optional = true }
 dirs = "5.0"
 uuid = { version = "1.11", features = ["v4", "serde"] }
 
 # Network & Protocol Utilities
-socket2 = "0.5"
+socket2 = { version = "0.5", features = ["all"] }
 simple-dns = "0.7"
 postcard = { version = "1.0", features = ["alloc"] }
 data-encoding = "2.6"

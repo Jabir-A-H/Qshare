@@ -34,13 +34,16 @@ impl CrashReporter {
             }
 
             // 3. Show native Win32 message box only in non-CI interactive user mode
-            let dialog_msg = "Qshare encountered an unexpected error and needs to close.\n\n\
-                              Crash details have been saved to your local application logs.";
-            rfd::MessageDialog::new()
-                .set_title("Qshare Unexpected Error")
-                .set_description(dialog_msg)
-                .set_level(rfd::MessageLevel::Error)
-                .show();
+            #[cfg(feature = "desktop")]
+            {
+                let dialog_msg = "Qshare encountered an unexpected error and needs to close.\n\n\
+                                  Crash details have been saved to your local application logs.";
+                rfd::MessageDialog::new()
+                    .set_title("Qshare Unexpected Error")
+                    .set_description(dialog_msg)
+                    .set_level(rfd::MessageLevel::Error)
+                    .show();
+            }
         }));
     }
 

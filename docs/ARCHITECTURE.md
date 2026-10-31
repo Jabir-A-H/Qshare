@@ -1,7 +1,7 @@
 # Qshare Architecture Specification
 
 **Author:** Jabir Abdullah Haian & Antigravity  
-**Version:** 0.1.0-alpha  
+**Version:** 0.2.0  
 **Status:** In Active Pre-Production Development  
 
 ---
@@ -185,10 +185,46 @@ In accordance with [ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native
 | **iOS** | Swift + SwiftUI | Native `.ipa` | Apple Metal | ~14 MB size; native CocoaTouch | iOS Share Extension, `NSBonjourServices` local discovery, Camera QR scanner |
 
 ### Foreign Function Interface (FFI) Contract: Mozilla UniFFI
-All mobile and Apple desktop interfaces communicate with the Rust engine via **Mozilla `uniffi-rs`**:
-- Defines high-level interfaces using UDL / procedural macros in `src/core/`.
-- Compiles `src/core/` as a dynamic library (`cdylib`):
-  - `libqshare_core.so` for Android (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
-  - `libqshare_core.dylib` / static framework for macOS and iOS (`aarch64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`).
-- Automatically generates typed Kotlin Flow streams and Swift Async sequences, eliminating manual JNI and raw C pointer marshalling.
+All mobile and Apple desktop interfaces communicate with the Rust engine via **Mozilla `uniffi-rs` (v0.28)**:
+- Modular crate architecture in `crates/qshare-ffi/` depending on the headless core (`qshare = { path = "../..", default-features = false }`).
+- Proc-macro annotations (`#[derive(uniffi::Record)]`, `#[uniffi::export]`, `uniffi::setup_scaffolding!()`) eliminating duplicate UDL maintenance.
+- Compiles as a dynamic library (`cdylib`):
+  - `libqshare_ffi.so` for Android (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
+  - `libqshare_ffi.dylib` for Apple Silicon & Intel macOS (`aarch64-apple-darwin`, `x86_64-apple-darwin`).
+- Bindings are generated in `--library` mode directly from compiled binaries (`--library <path_to_cdylib> --no-format`), guaranteeing exact symbol synchronization across Kotlin and Swift runtimes.
+
+---
+
+## 8. Two-Tier CI/CD Pipeline & Automated Release Lifecycle
+
+Qshare enforces a strict two-tier GitHub Actions architecture to balance continuous testing with clutter-free repositories and permanent release records:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Tier 1: Push / Nightly                          │
+│                      (.github/workflows/nightly.yml)                   │
+├────────────────────────────────┬───────────────────────────────────────┤
+│ Trigger:                       │ Every push to `main`                  │
+│ Build Scope:                   │ Windows (.exe/.zip), Android (.apk),  │
+│                                │ macOS Universal (.zip)                │
+│ Artifact Retention:            │ 3 days (Actions temporary storage)    │
+│ Outdated Artifact Pruning:     │ Automatic via `gh api` cleanup step   │
+│ Git Releases Created:          │ None                                  │
+└────────────────────────────────┴───────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                    Tier 2: Unified Production Release                  │
+│                      (.github/workflows/release.yml)                   │
+├────────────────────────────────┬───────────────────────────────────────┤
+│ Trigger:                       │ Manual click (workflow_dispatch) / v* │
+│ Build Scope:                   │ All 3 platforms in parallel matrix    │
+│ Changelog Generation:          │ Automated Categorized Conventional    │
+│                                │ (✨ Features, 🐛 Fixes, ⚡ Perf, etc.) │
+│ Verification:                  │ Consolidated SHA-256 Checksums table  │
+│ Permanence:                    │ Permanent GitHub Releases (no delete) │
+└────────────────────────────────┴───────────────────────────────────────┘
+```
+
+1. **Principle 8 Enforcement:** Every release artifact strictly embeds its semantic version (`qshare-v<version>-<platform>.<ext>`), completely eliminating bare, non-numbered binaries.
+2. **Atomic Release Publisher:** Build jobs upload platform binaries as intermediate artifacts; a final publisher job downloads all artifacts, generates release notes with commit attribution, computes cryptographic verification hashes, and creates the single release entry.
 

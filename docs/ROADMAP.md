@@ -70,14 +70,14 @@
 ---
 
 ## Phase 6: Multiplatform Core Decoupling via UniFFI (Completed)
-- [x] Record formal architecture record ([ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native-ecosystem-cockpit-architecture.md)).
+- [x] Record formal architecture records ([ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native-ecosystem-cockpit-architecture.md), [ADR 0003](file:///d:/WebDev/rust/Qshare/docs/ADR/0003-two-tier-ci-cd-and-headless-ffi-decoupling.md)).
 - [x] Configure headless core decoupling via feature flags (`[features] default = ["desktop"]`) and standalone `crates/qshare-ffi` UniFFI crate.
 - [x] Integrate Mozilla `uniffi-rs` (v0.28) interface definitions in `crates/qshare-ffi/src/lib.rs`:
   - [x] Ephemeral keypair and Base32 ticket operations.
   - [x] P2P transfer session lifecycle and chunk streaming states.
   - [x] mDNS local network discovery emitter and peer lifecycle.
 - [x] Set up `cargo-ndk` cross-compilation pipeline for Android ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`) on GitHub Actions.
-- [x] Set up Apple target cross-compilation pipeline (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-apple-ios`) on GitHub Actions.
+- [x] Set up Apple target cross-compilation pipeline (`aarch64-apple-darwin`, `x86_64-apple-darwin`) on GitHub Actions.
 - [x] Build automated CI/CD two-tier matrix: nightly artifact builds with auto-prune, and unified multi-platform release publisher.
 
 ---

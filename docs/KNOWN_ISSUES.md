@@ -42,3 +42,24 @@ This document tracks active bugs, network field edge cases, security considerati
 - **Impact:** High (Process ran in background but window never appeared on screen)
 - **Description:** Invoking `iced::application().centered().run()` without explicit `window::Settings` caused `winit` on Windows to allocate an uninitialized surface measuring `Width=0, Height=0` with `Visible=False`. Combined with `#![windows_subsystem = "windows"]`, the app appeared completely unresponsive to the user.
 - **Resolution:** Configured explicit `iced::window::Settings` with an initial size of `850 × 650`, `min_size: 600 × 450`, and centered positioning. Attached `std::panic::set_hook` and `rfd::MessageDialog` to ensure any future launch issues or panics display a native Windows error popup and log to `qshare_crash.log`.
+
+### KI-005: Transitive Windowing Dependencies in FFI Mobile Targets
+- **Category:** Build & Toolchain / Mobile
+- **Status:** `[RESOLVED]` (Resolved on 2026-10-31 in commit `0af4ab0`)
+- **Impact:** High (Android NDK cross-compilation failed due to `android-activity` missing Activity backend)
+- **Description:** `crates/qshare-ffi` depended directly on `qshare` with default features enabled, pulling in `iced` -> `winit` -> `android-activity`. Because `crates/qshare-ffi` is a headless background engine, the inclusion of windowing crates broke Android compilation.
+- **Resolution:** Introduced `[features] default = ["desktop"]` in root `Cargo.toml`, gated `iced` and `rfd` as optional desktop dependencies, and added `required-features = ["desktop"]` on `[[bin]] name = "qshare"`. Updated `crates/qshare-ffi` to depend on `qshare = { path = "../..", default-features = false }`.
+
+### KI-006: UniFFI Bindgen UDL Syntax Error with Proc-Macro Scaffolding
+- **Category:** Build & Toolchain / UniFFI
+- **Status:** `[RESOLVED]` (Resolved on 2026-10-31 in commit `92a0066`)
+- **Impact:** High (`uniffi-bindgen generate` exited with `parse error` on Rust source files)
+- **Description:** Invoking `uniffi-bindgen generate src/lib.rs` caused the CLI to invoke the `weedle2` UDL parser on raw Rust syntax, expecting a WebIDL `.udl` definition rather than procedural macro annotations.
+- **Resolution:** Updated CI bindgen invocations to pass the compiled dynamic library via `--library` mode (`--library <path_to_cdylib> --no-format`), extracting procedural macro definitions directly from the compiled binary.
+
+### KI-007: Netdev libc in6_ifreq Darwin vs. iOS Symbol Mismatch
+- **Category:** Build & Toolchain / Apple iOS
+- **Status:** `[RESOLVED]` (Resolved on 2026-10-31 in commit `92a0066`)
+- **Impact:** Medium (`cargo build --target aarch64-apple-ios` failed with unresolved symbol `in6_ifreq`)
+- **Description:** The `netdev` crate's Darwin network interface enumerator referenced `libc::in6_ifreq`, which is exposed on macOS (Darwin) but omitted in the iOS libc definitions.
+- **Resolution:** Scoped the active Apple build matrix to macOS Universal desktop targets (`aarch64-apple-darwin` and `x86_64-apple-darwin`) and standalone Swift framework packaging. iOS interface enumeration will be integrated in Phase 8 via Apple's native `Network.framework`.

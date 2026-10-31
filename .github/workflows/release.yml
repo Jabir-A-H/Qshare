@@ -159,8 +159,9 @@ jobs:
       - name: Generate UniFFI Kotlin Bindings
         run: |
           cargo run --manifest-path crates/qshare-ffi/Cargo.toml --bin uniffi-bindgen \
-            generate crates/qshare-ffi/src/lib.rs \
+            generate --library android/app/src/main/jniLibs/arm64-v8a/libqshare_ffi.so \
             --language kotlin \
+            --no-format \
             --out-dir android/app/src/main/kotlin/uniffi/
 
       - name: Set up Gradle
@@ -204,7 +205,7 @@ jobs:
       - name: Install Rust Stable Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Cargo Dependencies
         uses: Swatinem/rust-cache@v2
@@ -233,22 +234,21 @@ jobs:
           cd ../../..
           echo "Packaged ${ZIP_NAME}"
 
-      - name: Build Native iOS & macOS Engine Library (UniFFI)
+      - name: Build Native macOS Engine Library (UniFFI)
         run: |
-          cargo build --manifest-path crates/qshare-ffi/Cargo.toml --release --target aarch64-apple-ios
           cargo build --manifest-path crates/qshare-ffi/Cargo.toml --release --target aarch64-apple-darwin
           mkdir -p apple/generated
           cargo run --manifest-path crates/qshare-ffi/Cargo.toml --bin uniffi-bindgen \
-            generate crates/qshare-ffi/src/lib.rs \
+            generate --library crates/qshare-ffi/target/aarch64-apple-darwin/release/libqshare_ffi.dylib \
             --language swift \
+            --no-format \
             --out-dir apple/generated/
 
-      - name: Package iOS & macOS Native Swift Framework Archive
+      - name: Package macOS Native Swift Framework Archive
         run: |
           TAG="${{ needs.resolve-meta.outputs.tag }}"
           FRAMEWORK_ZIP="qshare-${TAG}-apple-frameworks.zip"
-          mkdir -p apple/build/ios apple/build/macos
-          cp crates/qshare-ffi/target/aarch64-apple-ios/release/libqshare_ffi.a apple/build/ios/
+          mkdir -p apple/build/macos
           cp crates/qshare-ffi/target/aarch64-apple-darwin/release/libqshare_ffi.dylib apple/build/macos/
           cp -r apple/generated apple/build/
           cd apple/build

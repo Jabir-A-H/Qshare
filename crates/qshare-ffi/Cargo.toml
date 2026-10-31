@@ -1,0 +1,23 @@
+[package]
+name = "qshare-ffi"
+version = "0.2.0"
+edition = "2024"
+authors = ["Jabir Abdullah Haian"]
+description = "Universal FFI bindings for Qshare mobile and Apple cockpits (UniFFI)"
+license = "UNLICENSED"
+
+[lib]
+name = "qshare_ffi"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+
+[dependencies]
+qshare = { path = "../.." }
+uniffi = { version = "0.28", features = ["cli", "tokio"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+thiserror = "2.0"
+uuid = { version = "1.11", features = ["v4"] }

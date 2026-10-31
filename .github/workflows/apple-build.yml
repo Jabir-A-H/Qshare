@@ -1,0 +1,115 @@
+name: Build & Export Apple Platforms (macOS & iOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (leave empty to auto-read from Cargo.toml, e.g. v0.2.0)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apple:
+    name: Build macOS Binary & iOS Framework
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            crates/qshare-ffi
+
+      - name: Resolve Version & Tag
+        id: meta
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d '"' -f2)
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$CARGO_VERSION"
+          fi
+          echo "Resolved Tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Build Universal macOS Desktop Binary (Apple Silicon + Intel)
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          mkdir -p target/release/macos
+          lipo -create -output target/release/macos/qshare \
+            target/aarch64-apple-darwin/release/qshare \
+            target/x86_64-apple-darwin/release/qshare
+          chmod +x target/release/macos/qshare
+
+      - name: Package macOS Universal Archive
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          ZIP_NAME="qshare-${TAG}-macos-universal.zip"
+          cd target/release/macos
+          zip -r "../../../${ZIP_NAME}" qshare
+          cd ../../..
+          shasum -a 256 "${ZIP_NAME}" > "checksum-${ZIP_NAME}.txt"
+          echo "Packaged ${ZIP_NAME}"
+
+      - name: Build Native iOS & macOS Engine Library (UniFFI)
+        run: |
+          cargo build --manifest-path crates/qshare-ffi/Cargo.toml --release --target aarch64-apple-ios
+          cargo build --manifest-path crates/qshare-ffi/Cargo.toml --release --target aarch64-apple-darwin
+          mkdir -p apple/generated
+          cargo run --manifest-path crates/qshare-ffi/Cargo.toml --bin uniffi-bindgen \
+            generate crates/qshare-ffi/src/lib.rs \
+            --language swift \
+            --out-dir apple/generated/
+
+      - name: Package iOS & macOS Native Swift Framework Archive
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          FRAMEWORK_ZIP="qshare-${TAG}-apple-frameworks.zip"
+          mkdir -p apple/build/ios apple/build/macos
+          cp crates/qshare-ffi/target/aarch64-apple-ios/release/libqshare_ffi.a apple/build/ios/
+          cp crates/qshare-ffi/target/aarch64-apple-darwin/release/libqshare_ffi.dylib apple/build/macos/
+          cp -r apple/generated apple/build/
+          cd apple/build
+          zip -r "../../${FRAMEWORK_ZIP}" .
+          cd ../..
+          shasum -a 256 "${FRAMEWORK_ZIP}" > "checksum-${FRAMEWORK_ZIP}.txt"
+          echo "Packaged ${FRAMEWORK_ZIP}"
+
+      - name: Upload Apple Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qshare-${{ steps.meta.outputs.tag }}-apple-builds
+          path: |
+            qshare-*-macos-universal.zip
+            qshare-*-apple-frameworks.zip
+            checksum-*.txt
+
+      - name: Attach Apple Artifacts to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          files: |
+            qshare-*-macos-universal.zip
+            qshare-*-apple-frameworks.zip
+            checksum-*.txt

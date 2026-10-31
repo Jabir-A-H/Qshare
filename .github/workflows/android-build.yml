@@ -1,0 +1,116 @@
+name: Build & Export Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (leave empty to auto-read from Cargo.toml, e.g. v0.2.0)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+          add-to-path: true
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            crates/qshare-ffi
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Resolve Version & Tag
+        id: meta
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d '"' -f2)
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$CARGO_VERSION"
+          fi
+          echo "Resolved Tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Build Native Rust Engine for Android (arm64, armv7, x86_64)
+        run: |
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 \
+            -o android/app/src/main/jniLibs \
+            build --manifest-path crates/qshare-ffi/Cargo.toml --release
+
+      - name: Generate UniFFI Kotlin Bindings
+        run: |
+          cargo run --manifest-path crates/qshare-ffi/Cargo.toml --bin uniffi-bindgen \
+            generate crates/qshare-ffi/src/lib.rs \
+            --language kotlin \
+            --out-dir android/app/src/main/kotlin/uniffi/
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Android APK with Gradle
+        run: |
+          cd android
+          gradle assembleRelease --no-daemon
+
+      - name: Package Version-Numbered APK
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          APK_SRC=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          APK_DEST="qshare-${TAG}-android.apk"
+          cp "$APK_SRC" "$APK_DEST"
+          sha256sum "$APK_DEST" > "checksum-${APK_DEST}.txt"
+          echo "Generated $APK_DEST"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qshare-${{ steps.meta.outputs.tag }}-android-apk
+          path: |
+            qshare-*-android.apk
+            checksum-*.txt
+
+      - name: Attach APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          files: |
+            qshare-*-android.apk
+            checksum-*.txt

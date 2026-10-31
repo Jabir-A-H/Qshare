@@ -66,3 +66,43 @@
 - [x] Configure automated GitHub Actions release workflow and enforce Strictly Version-Numbered Executable Invariant (Principle 8).
 - [x] Publish initial pre-production developer preview release (`v0.2.0-alpha`).
 - [ ] Generate installer bundle via `cargo-wix` / `Inno Setup`.
+
+---
+
+## Phase 6: Multiplatform Core Decoupling via UniFFI (Planned)
+- [ ] Record formal architecture record ([ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native-ecosystem-cockpit-architecture.md)).
+- [ ] Configure `Cargo.toml` with dual `[lib]` crate types (`rlib` and `cdylib`).
+- [ ] Integrate Mozilla `uniffi-rs` interface definitions in `src/core/`:
+  - [ ] Ephemeral keypair and Base32 ticket operations.
+  - [ ] P2P transfer session lifecycle and chunk streaming states.
+  - [ ] mDNS local network discovery emitter and peer lifecycle.
+- [ ] Set up `cargo-ndk` cross-compilation pipeline for Android ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
+- [ ] Set up Apple target cross-compilation pipeline (`aarch64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`).
+- [ ] Write headless foreign-function interface integration tests.
+
+---
+
+## Phase 7: Native Android APK Shell (Planned)
+- [ ] Scaffold Android Studio project with Kotlin & Jetpack Compose (`mobile/android/`).
+- [ ] Integrate generated `libqshare_core.so` and UniFFI Kotlin bindings.
+- [ ] Implement `StorageAccessFramework` (SAF) and `DocumentFile` file picker and streaming sink.
+- [ ] Implement `WifiManager.MulticastLock` lifecycle management to preserve mDNS packet ingress.
+- [ ] Implement Android **Foreground Service** with active transfer progress notification bar.
+- [ ] Implement CameraX QR barcode scanner for instant Share Ticket import.
+- [ ] Register Android `ACTION_SEND` and `ACTION_SEND_MULTIPLE` intent filters for OS-wide Share Sheet support.
+- [ ] Configure automated GitHub Actions APK release packaging (`qshare-v<version>-android.apk`).
+
+---
+
+## Phase 8: Native Apple Ecosystem Shells (Planned)
+- [ ] Scaffold unified Xcode project with Swift & SwiftUI (`apple/`).
+- [ ] Integrate generated UniFFI Swift framework.
+- [ ] Build macOS native Cockpit:
+  - [ ] Persistent Menu Bar icon and drag-and-drop dropzone.
+  - [ ] Finder right-click context menu extension ("Share via Qshare").
+  - [ ] Native macOS Notification Center integration.
+- [ ] Build iPhone iOS native Cockpit:
+  - [ ] iOS Share Extension for Photos, Files, and Safari.
+  - [ ] AVFoundation camera QR code scanner.
+  - [ ] `NSBonjourServices` local network entitlement for mDNS radar discovery.
+

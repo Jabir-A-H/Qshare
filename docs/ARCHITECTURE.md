@@ -148,3 +148,47 @@ The UI listens to background engine events via `Subscription::batch`:
 | **Disk Overwrite & Traversal** | Malicious peer sending `../../Windows/System32/file` | Strict `PathSanitizer` in `src/core/security.rs`: rejects path traversals (`..`, `/`, `\`), strips illegal Win32 characters, and prefixes all 25 DOS reserved device names (`CON`, `PRN`, `AUX`, `NUL`, etc.). |
 | **Collision Overwrite** | Incoming file matching existing filename | Collision-safe auto-incrementing jailing resolving against both finalized files and active `.part` streams (`file (1).ext`). |
 | **Antivirus Lock Stalls** | Windows Defender locking newly written files | Asynchronous retry loop with exponential backoff (`atomic_rename_with_retry`) mitigating transient sharing locks (`ERROR_SHARING_VIOLATION`). |
+
+---
+
+## 7. Multi-Platform Strategy & Native Shell Architecture
+
+In accordance with [ADR 0002](file:///d:/WebDev/rust/Qshare/docs/ADR/0002-native-ecosystem-cockpit-architecture.md), Qshare implements a **"Shared Rust Core, Native Cockpits"** architecture to deliver the maximum possible optimization for each individual operating system:
+
+```
+                         ┌─────────────────────────────────────────┐
+                         │      Universal Core (src/core/)         │
+                         │   - Pure Rust (Iroh + BLAKE3 + mDNS)    │
+                         └────────────────────┬────────────────────┘
+                                              │
+                 ┌────────────────────────────┼────────────────────────────┐
+                 │ Direct in-process          │ UniFFI (Kotlin)            │ UniFFI (Swift)
+                 ▼                            ▼                            ▼
+┌─────────────────────────────────┐ ┌─────────────────────────────────┐ ┌─────────────────────────────────┐
+│     Windows & Linux Desktop     │ │           Android APK           │ │       macOS & iPhone iOS        │
+│  - Pure Rust (Iced + wgpu)      │ │  - Native Kotlin + Compose      │ │  - Native Swift + SwiftUI       │
+│  - DirectX 12 / Vulkan GPU      │ │  - Storage Access Framework     │ │  - Metal GPU Acceleration       │
+│  - 15 MB standalone executable  │ │  - Android Foreground Service   │ │  - AirDrop-like Dropzone        │
+│  - ~20 MB idle RAM; 0 runtimes  │ │  - WifiManager.MulticastLock    │ │  - iOS Share Sheet Extension    │
+│  - Instant 40ms launch          │ │  - CameraX QR Ticket Scanner    │ │  - Camera QR Ticket Scanner     │
+└─────────────────────────────────┘ └─────────────────────────────────┘ └─────────────────────────────────┘
+```
+
+### Ecosystem Matrix & Native Capabilities
+
+| Platform | Presentation Stack | Packaging Target | Graphics Engine | Memory & Size Profile | Native OS Capabilities Integrated |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Windows** | Pure Rust (`Iced 0.13`) | Portable `.exe` / `.msi` | DirectX 12 (`wgpu`) | ~15 MB size; ~20 MB RAM | Crash reporting to `%LOCALAPPDATA%`, Win32 Shell integration |
+| **Linux** | Pure Rust (`Iced 0.13`) | Standalone binary / `.deb` | Vulkan / Wayland (`wgpu`) | ~14 MB size; ~18 MB RAM | Native Wayland/X11 surface, system tray |
+| **Android** | Kotlin + Jetpack Compose | Native `.apk` / `.aab` | Android HWUI / Skia | ~12 MB size; native ART | Storage Access Framework (SAF), Foreground Service, `MulticastLock`, CameraX QR scanning, `ACTION_SEND` Share Sheet |
+| **macOS** | Swift + SwiftUI | Native `.app` / `.dmg` | Apple Metal | ~16 MB size; native Cocoa | Persistent Menu Bar dropzone, Finder context menu, Notification Center |
+| **iOS** | Swift + SwiftUI | Native `.ipa` | Apple Metal | ~14 MB size; native CocoaTouch | iOS Share Extension, `NSBonjourServices` local discovery, Camera QR scanner |
+
+### Foreign Function Interface (FFI) Contract: Mozilla UniFFI
+All mobile and Apple desktop interfaces communicate with the Rust engine via **Mozilla `uniffi-rs`**:
+- Defines high-level interfaces using UDL / procedural macros in `src/core/`.
+- Compiles `src/core/` as a dynamic library (`cdylib`):
+  - `libqshare_core.so` for Android (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
+  - `libqshare_core.dylib` / static framework for macOS and iOS (`aarch64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`).
+- Automatically generates typed Kotlin Flow streams and Swift Async sequences, eliminating manual JNI and raw C pointer marshalling.
+
